@@ -16,7 +16,9 @@ class Redis
       :db => 0,
       :driver => nil,
       :id => nil,
-      :tcp_keepalive => 0
+      :tcp_keepalive => 0,
+      :sentinels => [],
+      :sentinel_master => nil
     }
 
     def scheme
@@ -49,6 +51,14 @@ class Redis
 
     def db=(db)
       @options[:db] = db.to_i
+    end
+
+    def sentinels
+      @options[:sentinels]
+    end
+
+    def sentinel_master
+      @options[:sentinel_master]
     end
 
     attr_accessor :logger
@@ -260,7 +270,7 @@ class Redis
     end
 
     def establish_connection
-      @connection = @options[:driver].connect(@options.dup)
+      @connection = @options[:driver].connect(_parse_options(@options.dup))
 
     rescue TimeoutError
       raise CannotConnectError, "Timed out connecting to Redis on #{location}"
@@ -313,7 +323,7 @@ class Redis
         options[key] = options[key.to_s] if options.has_key?(key.to_s)
       end
 
-      url = options[:url] || defaults[:url]
+      url = (options.has_key?(:sentinels) && !options[:sentinels].empty?) ? _get_master_from_sentinels(options) : (options[:url] || defaults[:url])
 
       # Override defaults from URL if given
       if url
@@ -374,6 +384,24 @@ class Redis
       end
 
       options
+    end
+
+    def _get_master_from_sentinels(opts)
+      opts[:sentinels].each do |sentinel|
+        begin
+          master = _find_master(sentinel, opts[:sentinel_master], opts)
+          return master if master
+        rescue Redis::CannotConnectError
+        end
+      end
+      raise Redis::CannotConnectError
+    end
+
+    def _find_master(sentinel, master_name, options={})
+      cleaned_opts = options.reject{|k,v| [:sentinels, :sentinel_master].include?(k)}
+      redis = Redis.new(url: sentinel)
+      host, port = redis.sentinel("get-master-addr-by-name", master_name)
+      return "redis://#{host}:#{port}"
     end
 
     def _parse_driver(driver)

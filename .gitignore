@@ -1,4 +1,4 @@
-nohup.out
+enohup.out
 redis/*
 rdsrv
 pkg/*
@@ -8,3 +8,4 @@ coverage/*
 *.swp
 .yardoc
 doc/
+.pryrc
