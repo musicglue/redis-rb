@@ -401,7 +401,7 @@ class Redis
       cleaned_opts = options.reject{|k,v| [:sentinels, :sentinel_master].include?(k)}
       redis = Redis.new(url: sentinel)
       host, port = redis.sentinel("get-master-addr-by-name", master_name)
-      return "redis://#{host}:#{port}"
+      return "redis://#{host}:#{port}/#{options[:db]}"
     end
 
     def _parse_driver(driver)
